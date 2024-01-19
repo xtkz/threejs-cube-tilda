@@ -1,0 +1,225 @@
+<div id="canvas-wrap">
+    <canvas class="webgl"></canvas>
+    <div id="overlay1" class="overlay">
+        <a href="#popup:infoblock1">Ссылка1</a>
+    </div>
+    <div id="overlay2" class="overlay">
+        <a href="#popup:infoblock2">Ссылка2</a>
+    </div>
+    <div id="overlay3" class="overlay">
+        <a href="#popup:infoblock1">Ссылка3</a>
+    </div>
+    <div id="overlay4" class="overlay">
+        <a href="#popup:infoblock2">Ссылка4</a>
+    </div>
+    <div id="overlay5" class="overlay">
+        <a href="#popup:infoblock1">Ссылка5</a>
+    </div>
+    <div id="overlay6" class="overlay">
+        <a href="#popup:infoblock2">Ссылка6</a>
+    </div>
+</div>
+
+<style>
+    .webgl {
+        outline: none;
+        overflow: hidden;
+    }
+
+    #canvas-wrap {
+        position: relative;
+        outline: none;
+        overflow: hidden;
+    }
+
+    .overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin-top: -50px;
+        margin-left: -50px;
+        width: 100px;
+        height: 100px;
+        background-color: #eeeeee;
+        border-radius: 50px;
+        opacity: 0;
+        display: none;
+    }
+
+    .visible {
+        opacity: 1;
+        display: block;
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .overlay a {
+        display: block;
+        text-align: center;
+        height: 100%;
+        color: rgba(0, 0, 0, 0);
+        font-family: 'Courier New', Courier, monospace;
+    }
+</style>
+
+<script type="importmap">
+              {
+                  "imports": {
+                    "three": "https://unpkg.com/three@v0.160.0/build/three.module.js",
+                    "three/addons/": "https://unpkg.com/three@v0.160.0/examples/jsm/"
+                  }
+              }
+          </script>
+
+<script type="module">
+
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+    const canvas = document.querySelector('canvas.webgl')
+
+    const gltfLoader = new GLTFLoader()
+    const dracoLoader = new DRACOLoader()
+    dracoLoader.setDecoderPath('/draco/')
+    gltfLoader.setDRACOLoader(dracoLoader)
+
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color( 0x111111 );
+    gltfLoader.load(
+    'cube001.glb',
+        (gltf) => {
+            scene.add(gltf.scene.children[0])
+        },
+        (progress) => {
+            console.log('progress')
+            console.log(progress)
+        },
+        (error) => {
+            console.log('error')
+            console.log(error)
+        }
+    )
+
+    const cubeHalfSize = 0.72
+
+    const geometry = new THREE.BoxGeometry(cubeHalfSize*2, cubeHalfSize*2, cubeHalfSize*2, 1, 1, 1)
+    const material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 })
+    const mesh = new THREE.Mesh(geometry, material)
+    scene.add(mesh)
+
+    const axesHelper = new THREE.AxesHelper(2);
+    // scene.add(axesHelper);
+
+    const directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
+    directionalLight.position.set( -10, 2, -10 );
+    directionalLight.target = mesh
+    scene.add( directionalLight );
+
+
+    /**
+     * Raycaster
+     */
+    const raycaster = new THREE.Raycaster();
+
+    const sizes = {
+        width: window.innerWidth,
+        height: 600,
+    }
+
+    const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height)
+    camera.position.set(2, 1, 2)
+    camera.lookAt([0,0,0])
+    scene.add(camera)
+
+    const renderer = new THREE.WebGLRenderer({
+        canvas: canvas,
+        antialias: true,
+    })
+    renderer.setSize(sizes.width, sizes.height)
+
+    // Controls
+    const controls = new OrbitControls(camera, canvas)
+    controls.enableDamping = true;
+    controls.enablePan = false;
+    controls.enableZoom = false;
+
+
+    const points = [
+        {
+            position: new THREE.Vector3(cubeHalfSize+0.01, 0, 0),
+            element: document.querySelector('#overlay1')
+        },
+        {
+            position: new THREE.Vector3(0, 0, cubeHalfSize+0.01),
+            element: document.querySelector('#overlay2')
+        },
+        {
+            position: new THREE.Vector3(-cubeHalfSize-0.01, 0, 0),
+            element: document.querySelector('#overlay3')
+        },
+        {
+            position: new THREE.Vector3(0, 0, -cubeHalfSize-0.01),
+            element: document.querySelector('#overlay4')
+        },
+        {
+            position: new THREE.Vector3(0, cubeHalfSize+0.01, 0),
+            element: document.querySelector('#overlay5')
+        },
+        {
+            position: new THREE.Vector3(0, -cubeHalfSize-0.01, 0),
+            element: document.querySelector('#overlay6')
+        },
+    ]
+
+    /**
+     * Animate
+    */
+    const tick = () => {
+        // Update controls
+        controls.update()
+
+        // Go through each point
+        for (const point of points) {
+
+            const screenPosition = point.position.clone()
+            screenPosition.project(camera)
+
+            raycaster.setFromCamera(screenPosition, camera)
+            const intersects = raycaster.intersectObjects([mesh], false)
+            
+
+            if (intersects.length === 0) {
+                point.element.classList.add('visible')
+                //   console.log("ADD");
+                //   console.log(point.element);
+            }
+            else {
+                const intersectionDistance = intersects[0].distance
+                const pointDistance = point.position.distanceTo(camera.position)
+
+                if (intersectionDistance <= pointDistance) {
+                    point.element.classList.remove('visible')
+                }
+                else {
+                    point.element.classList.add('visible')
+                }
+            }
+
+            const translateX = screenPosition.x * sizes.width * 0.5
+            const translateY = - screenPosition.y * sizes.height * 0.5
+            point.element.style.transform = `translateX(${translateX}px) translateY(${translateY}px)`
+        }
+
+
+        // Render
+        renderer.render(scene, camera)
+
+
+        // Call tick again on the next frame
+        window.requestAnimationFrame(tick)
+    }
+
+    tick()
+
+</script>
